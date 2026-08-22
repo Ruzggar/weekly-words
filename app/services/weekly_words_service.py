@@ -1,0 +1,90 @@
+from app.extensions import db
+from app.models.weekly_words import WeeklyWords
+
+
+class WeeklyWordsService:
+    @staticmethod
+    def add_weekly_words(username, user_id, words, learning_language, known_language):
+        if not username or not user_id:
+            return {"error": "Kullanıcı adı veya ID boş olamaz"}, 400
+
+        if not words:
+            return {"error": "Kelimeler boş olamaz"}, 400
+
+        if not isinstance(words, list) or not isinstance(learning_language, str):
+            return {"error": "Kelimeler liste, dil string olmalıdır"}, 400
+
+        learning_language = learning_language.strip().lower()
+        known_language = known_language.strip().lower()
+        if learning_language not in ["tr", "en", "de", "el"] or known_language not in ["tr", "en", "de", "el"]:
+            return {"error": "Desteklenen diller: tr, en, de, el"}, 400
+
+        for word_dict in words:
+            # 1. Listenin elemanının gerçekten bir dict olduğunu doğrula (Çökmeyi önler)
+            if not isinstance(word_dict, dict):
+                return {"error": "Her bir kelime verisi sözlük yapısında olmalıdır"}, 400
+
+            w_word = word_dict.get("word")
+            w_meaning = word_dict.get("meaning")
+            w_type = word_dict.get("type")
+
+            # 2. Temel alanların doluluk kontrolü
+            if not w_word or not isinstance(w_word, str) or not w_meaning or not isinstance(w_meaning, str) or not w_type or not isinstance(w_type, list):
+                return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (TypeError)"}, 400
+
+            w_word = w_word.strip()
+            w_meaning = w_meaning.strip()
+            if not w_word or not w_meaning or not w_type:
+                return {"error": "Kelime, anlam veya tür alanı boş bırakılamaz"}, 400
+
+            word_dict["word"] = w_word
+            word_dict["meaning"] = w_meaning
+
+            for t in w_type:
+                # ileride burada dillere göre geçerli kelime türleri olup olmadığı kontrolü yapılacak
+                pass
+            # 3. Dile özel artikel kontrolü (Sadece w_type string ise ve 'noun' içeriyorsa)
+            if learning_language in ["de", "el"] and "noun" in w_type:
+                if not word_dict.get("article") or not isinstance(word_dict.get("article"), str):
+                    return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (NoArticle)"}, 400
+
+        last_week = WeeklyWords.query.filter_by(user_id=user_id).order_by(WeeklyWords.week_number.desc()).first()
+        if last_week and not last_week.completed:
+            return {"error": "Bir hafta tamamlanmamışken yenisine geçilemez"}, 409
+
+        new_week_number = last_week.week_number + 1 if last_week else 1
+
+        weekly_words = WeeklyWords(
+            user_id=user_id,
+            week_number=new_week_number,
+            words=words,
+            learning_language=learning_language,
+            known_language=known_language
+        )
+
+        db.session.add(weekly_words)
+
+        db.session.commit()
+
+        return {"msg": "Yeni haftalık kelimeler başarıyla oluşturuldu", "new_week_number": new_week_number}, 201
+
+    @staticmethod
+    def get_weekly_words(username, user_id, week_number):
+        if not username or week_number is None:
+            return {"error": "Kullanıcı adı veya hafta numarası boş olamaz"}, 400
+
+        weekly_words_of_user = WeeklyWords.query.filter_by(user_id=user_id, week_number=week_number).first()
+
+        if not weekly_words_of_user:
+            last_week = WeeklyWords.query.filter_by(user_id=user_id).order_by(WeeklyWords.week_number.desc()).first()
+            if week_number == 0 and last_week:
+                return {"words": last_week.words}, 200
+            else:
+                return {"error": f"{username} kullanıcısına ait {week_number} numaralı hafta bulunamadı"}, 404 if week_number != 0 else {"error": f"{username} kullanıcısına ait en son hafta bulunamadı"}, 404
+
+        return {"words": weekly_words_of_user.words}, 200
+
+    @staticmethod
+    def get_last_week_number(username, user_id):
+        last_week = WeeklyWords.query.filter_by(user_id=user_id).order_by(WeeklyWords.week_number.desc()).first()
+        return {"last_week_number": last_week.week_number}, 200 if last_week else {"error": f"{username} kullanıcısına ait en son hafta ve numarası bulunamadı"}, 404

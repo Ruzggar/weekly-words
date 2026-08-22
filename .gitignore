@@ -1,0 +1,17 @@
+# Çevresel değişkenler (API Key'ler burada)
+.env
+
+# Sanal ortam klasörü (kütüphanelerin olduğu dev klasör)
+venv/
+.venv/
+env/
+
+# Python önbellek dosyaları (Gereksiz kalabalık)
+__pycache__/
+*.pyc
+
+# PyCharm ayar dosyaları
+.idea/
+
+# Veritabanı
+.db
