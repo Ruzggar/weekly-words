@@ -76,4 +76,21 @@ def create_app():
         db.create_all()
         print("Veritabanı ve tablolar başarıyla oluşturuldu/kontrol edildi!")
 
+        # --- SÜRESİ DOLMUŞ TOKEN'LARI TEMİZLEME İŞLEMİ ---
+        # Şu anki zamandan, token geçerlilik süresini (7 gün) çıkarıyoruz
+        expiration_timedelta = app.config['JWT_ACCESS_TOKEN_EXPIRES']
+        threshold_date = datetime.now(timezone.utc) - expiration_timedelta
+
+        # threshold_date'ten daha eski olan (yani 7 günü doldurmuş) kayıtları bul ve sil
+        deleted_count = db.session.query(TokenBlocklist).filter(
+            TokenBlocklist.created_at < threshold_date
+        ).delete()
+
+        db.session.commit()
+
+        if deleted_count > 0:
+            print(f"Temizlik yapıldı: {deleted_count} adet süresi dolmuş token/marker blocklist'ten silindi.")
+
+    return app
+
     return app

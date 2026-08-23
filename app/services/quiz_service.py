@@ -1,5 +1,7 @@
+import random
 from typing import List
 from pydantic import BaseModel, Field
+from sqlalchemy import desc
 
 from app import extensions, db
 from app.models.user import User
@@ -7,17 +9,35 @@ from app.models.quiz import Quiz
 from app.models.weekly_words import WeeklyWords
 
 
+# Çoktan seçmeli soru yapısı
+class MultiChoiceItem(BaseModel):
+    question_sentence: str = Field(
+        description="A question sentence in the learning language containing a blank space (_____) (without the parentheses) where the target word should be.")
+    options: List[str] = Field(
+        description="Exactly 4 options, including one correct answer and three plausible distractors.", min_length=4,
+        max_length=4)
+    correct_option_index: int = Field(description="The integer index of the correct option (0, 1, 2, or 3).", ge=0,
+                                      le=3)
+
+
+# Çevirili örnek cümle yapısı
 class SentenceItem(BaseModel):
-    word: str = Field(description="Kullanılan hedef kelime")
-    part_of_speech: str = Field(description="Kelimenin cümlede kullanılan türü (örn: verb, noun)")
-    word_count: int = Field(description="Cümledeki toplam kelime sayısı")
-    text: str = Field(description="Üretilen örnek cümle")
+    sentence: str = Field(
+        description="An example sentence in the learning language that correctly uses the target word.")
+    translate: str = Field(
+        description="The translation of the sentence into the user's known language (known_language).")
 
 
-class TestScheme(BaseModel):
+# İçeriğin ana yapısı (multi_choice ve sentences listelerini barındırır)
+class QuizContent(BaseModel):
+    multi_choice: List[MultiChoiceItem] = Field(description="Multiple-choice questions generated for the target words.")
     sentences: List[SentenceItem] = Field(
-        description="Kurallara uygun olarak üretilen detaylı cümle objelerinin listesi."
-    )
+        description="Example sentences with translations generated for the target words.")
+
+
+# En dıştaki yanıt şeması
+class TestScheme(BaseModel):
+    content: QuizContent = Field(description="The complete generated quiz and study content.")
 
 
 class QuizService:
@@ -33,22 +53,62 @@ class QuizService:
         last_week = WeeklyWords.query.filter_by(user_id=user.id).order_by(WeeklyWords.week_number.desc()).first()
         if not last_week:
             return {"error": f"{username} isimli ve {user_id} id'li kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
-        if last_week.test_generated:
-            return {"error": "Zaten testi oluşturulmuş bir haftanın testi tekrar oluşturulamaz"}, 409
+
+        # Eğer zaten o haftanın 7 testini de oluşturmuşsa engelle (0'dan 6'ya kadar indeksler)
+        if last_week.last_generated_daily_quiz_number >= 6:
+            return {"error": "Bu haftanın tüm günlük testleri zaten oluşturulmuş."}, 400
+
+        if last_week.last_generated_daily_quiz_number > last_week.last_completed_daily_quiz_number:
+            return {"error": "Bir önceki günlük testi tamamlamadan yenisini oluşturamazsınız"}, 409
 
         last_weekly_words: List[dict] = last_week.words
+        last_weekly_words_length = len(last_weekly_words)
 
-        # Prompt'u daha otoriter ve adım adım (Chain of Thought) yapısına uygun hale getirdik
+        # 1. Kelimeleri günlere adil dağıtma (Artanları ilk günlere 1'er tane yediriyoruz)
+        number_per_day = last_weekly_words_length // 7
+        mod = last_weekly_words_length % 7
+
+        words_for_each_quiz = []
+        for i in range(7):
+            if i < mod:
+                words_for_each_quiz.append(number_per_day + 1)
+            else:
+                words_for_each_quiz.append(number_per_day)
+
+        seed_string = f"user_{user_id}_week_{last_week.week_number}"
+        local_random = random.Random(seed_string)
+
+        # Listeyi bu lokal obje ile karıştır
+        local_random.shuffle(words_for_each_quiz)
+
+        # 2. Yeni test indeksini ve bu testte kullanılacak kelime sayısını belirleme
+        new_generated_daily_quiz_number = last_week.last_generated_daily_quiz_number + 1
+        words_for_this_quiz = words_for_each_quiz[new_generated_daily_quiz_number]
+
+        # 3. Başlangıç indeksini doğru hesaplama
+        start_word_index = 0
+        for i in range(new_generated_daily_quiz_number):
+            start_word_index += words_for_each_quiz[i]
+
+        # 4. Liste dilimleme (slicing'de -1 kullanılmaz)
+        target_words = last_weekly_words[start_word_index: start_word_index + words_for_this_quiz]
+
+        # Prompt hazırlığı
         prompt = (
-            f"Target words and their details: {last_weekly_words}\n\n"
-            f"Language to use for sentences: {last_week.learning_language}\n\n"
+            f"Target words and their details: {target_words}\n\n"
+            f"Learning Language: {last_week.learning_language}\n"
+            f"Known Language (for translations): {last_week.known_language}\n\n"
             "STRICT RULES:\n"
-            "1. For each word and for EACH of its 'type' (part of speech), you MUST write EXACTLY 2 example sentences.\n"
-            "2. Keep the requested 'meaning' in mind while writing.\n"
-            "3. You must vary the lengths of the sentences. Across all generated sentences, try to balance these categories:\n"
-            "   - Short: 1-6 words\n"
-            "   - Medium: 7-11 words\n"
-            "   - Long: 12-15 words\n"
+            "1. For each word and for EACH of its 'type' (part of speech), generate EXACTLY ONE multiple-choice question AND EXACTLY ONE example sentence pair.\n"
+            "2. MULTI_CHOICE REQUIREMENTS:\n"
+            "   - 'question_sentence': Write a sentence in the Learning Language with a blank (e.g., '_____') where the target word belongs.\n"
+            "   - 'options': Provide exactly 4 options. One must be the correct target word. The other 3 must be plausible distractors in the Learning Language.\n"
+            "   - 'correct_option_index': Provide the integer index (0, 1, 2, or 3) indicating where the correct answer is in the 'options' list.\n"
+            "3. SENTENCES REQUIREMENTS:\n"
+            "   - 'sentence': Write a complete example sentence using the target word correctly in the Learning Language.\n"
+            "   - 'translate': Translate this sentence accurately into the Known Language.\n"
+            "4. Make sure to vary the lengths of all generated sentences across short (1-6 words), medium (7-11 words), and long (12-15 words).\n"
+            "5. The context of the sentences must align with the provided 'meaning' of the words.\n"
         )
 
         response = extensions.genai_client.models.generate_content(
@@ -62,25 +122,46 @@ class QuizService:
         )
 
         if response.parsed:
-            # Yapay zekanın döndüğü detaylı listeyi (SentenceItem listesi) alıyoruz
-            detailed_sentences = response.parsed.sentences
-
-            # Veritabanına kaydetmek için sadece 'text' (cümle) kısmını string listesi olarak ayıklıyoruz
-            example_sentences = [item.text for item in detailed_sentences]
-
+            result_dict = response.parsed.model_dump()
+            quiz_content = result_dict.get("content", {})
             last_week_number = last_week.week_number
 
+            # 5. Eksik olan day_number alanı eklendi
             new_quiz = Quiz(
                 user_id=user_id,
-                sentences=example_sentences,  # Eskisi gibi string listesi olarak kaydeder
-                week_number=last_week_number
+                content=quiz_content,
+                week_number=last_week_number,
+                day_number=new_generated_daily_quiz_number
             )
 
-            last_week.test_generated = True
+            last_week.last_generated_daily_quiz_number = new_generated_daily_quiz_number
+
             db.session.add(new_quiz)
             db.session.commit()
 
-            # İstersen kullanıcıya sadece cümleleri dönebilirsin
-            return {"sentences": example_sentences}, 200
+            return {"content": quiz_content}, 200
         else:
             return {"error": "Yapay zekadan geçerli bir yanıt alınamadı"}, 500
+
+    @staticmethod
+    def get_quiz_content(user_id, username, week_number, day_number):
+        quiz = Quiz.query.filter_by(
+            user_id=user_id,
+            week_number=week_number,
+            day_number=day_number
+        ).order_by(Quiz.id.desc()).first()
+        if quiz:
+            return {"content": quiz.content}, 200
+        else:
+            return {
+                "error": f"{username} kullanıcısına ait {week_number}. hafta ve {day_number}. güne ait bir quiz bulunamadı"}, 404
+
+    @staticmethod
+    def get_quiz_history(user_id, username):
+        last_quiz = Quiz.query.filter_by(user_id=user_id).order_by(desc(Quiz.week_number),
+                                                                   desc(Quiz.day_number)).first()
+        if not last_quiz:
+            return {"error": f"{username} kullanıcısına ait son quiz bulunamadı"}, 404
+        last_quiz_week = last_quiz.week_number
+        last_quiz_day = last_quiz.day_number
+        return {"last_quiz_week": last_quiz_week, "last_quiz_day": last_quiz_day}, 200

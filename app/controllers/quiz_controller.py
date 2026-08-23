@@ -15,3 +15,23 @@ def generate_quiz():
     result, status_code = QuizService.generate_quiz(username, user_id)
 
     return jsonify(result), status_code
+
+@quiz_bp.route('/get-quiz-content/<int:week_number>/<int:day_number>', methods=['GET'])
+@jwt_required()
+def get_quiz_content(week_number, day_number):
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = QuizService.get_quiz_content(user_id, username, week_number, day_number)
+
+    return jsonify(result), status_code
+
+@quiz_bp.route('/get-quiz-history', methods=['GET'])
+@jwt_required()
+def get_quiz_history():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = QuizService.get_quiz_history(user_id, username)
+
+    return jsonify(result), status_code
