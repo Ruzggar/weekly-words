@@ -55,8 +55,8 @@ class QuizService:
             return {"error": f"{username} isimli ve {user_id} id'li kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
 
         # Eğer zaten o haftanın 7 testini de oluşturmuşsa engelle (0'dan 6'ya kadar indeksler)
-        if last_week.last_generated_daily_quiz_number >= 6:
-            return {"error": "Bu haftanın tüm günlük testleri zaten oluşturulmuş."}, 400
+        if last_week.last_generated_daily_quiz_number >= 5:
+            return {"error": "Bu haftanın tüm günlük testleri zaten oluşturulmuş"}, 409
 
         if last_week.last_generated_daily_quiz_number > last_week.last_completed_daily_quiz_number:
             return {"error": "Bir önceki günlük testi tamamlamadan yenisini oluşturamazsınız"}, 409
@@ -64,12 +64,12 @@ class QuizService:
         last_weekly_words: List[dict] = last_week.words
         last_weekly_words_length = len(last_weekly_words)
 
-        # 1. Kelimeleri günlere adil dağıtma (Artanları ilk günlere 1'er tane yediriyoruz)
-        number_per_day = last_weekly_words_length // 7
-        mod = last_weekly_words_length % 7
+        # 1. Kelimeleri günlere adil dağıtma (Artık 7'ye değil 6'ya bölüyoruz)
+        number_per_day = last_weekly_words_length // 6
+        mod = last_weekly_words_length % 6
 
         words_for_each_quiz = []
-        for i in range(7):
+        for i in range(6):
             if i < mod:
                 words_for_each_quiz.append(number_per_day + 1)
             else:
@@ -83,6 +83,7 @@ class QuizService:
 
         # 2. Yeni test indeksini ve bu testte kullanılacak kelime sayısını belirleme
         new_generated_daily_quiz_number = last_week.last_generated_daily_quiz_number + 1
+
         words_for_this_quiz = words_for_each_quiz[new_generated_daily_quiz_number]
 
         # 3. Başlangıç indeksini doğru hesaplama
@@ -150,11 +151,39 @@ class QuizService:
             week_number=week_number,
             day_number=day_number
         ).order_by(Quiz.id.desc()).first()
-        if quiz:
+
+        if quiz and not quiz.final:
             return {"content": quiz.content}, 200
+        elif quiz and quiz.final:
+            return {"error": f"Final quiz olduğu için gönderilmedi, '/final-quiz/{week_number}'a istek atın"}, 409
         else:
             return {
                 "error": f"{username} kullanıcısına ait {week_number}. hafta ve {day_number}. güne ait bir quiz bulunamadı"}, 404
+
+    @staticmethod
+    def get_weekly_quizzes_content(user_id, username, week_number):
+        quizzes = Quiz.query.filter_by(
+            user_id=user_id,
+            week_number=week_number,
+        ).order_by(Quiz.day_number.asc()).all()
+
+        if quizzes:
+            # Son eleman final testi mi diye kontrol et. Öyleyse listeden çıkar (pop) ve değişkene ata.
+            final = None
+            if quizzes[-1].final:
+                final = quizzes.pop()
+
+            quiz_dict = {}
+            for quiz in quizzes:
+                quiz_dict[f"day_number_{quiz.day_number}"] = quiz.content
+
+            if final:
+                quiz_dict["final"] = final.content
+
+            return {"quizzes": quiz_dict}, 200
+        else:
+            return {
+                "error": f"{username} kullanıcısına ait {week_number}. haftanın günlük testleri bulunamadı"}, 404
 
     @staticmethod
     def get_quiz_history(user_id, username):
@@ -165,3 +194,57 @@ class QuizService:
         last_quiz_week = last_quiz.week_number
         last_quiz_day = last_quiz.day_number
         return {"last_quiz_week": last_quiz_week, "last_quiz_day": last_quiz_day}, 200
+
+    @staticmethod
+    def get_or_generate_final_quiz(user_id, username, week_number):
+        final_quiz = Quiz.query.filter_by(
+            user_id=user_id,
+            week_number=week_number,
+            final=True
+        ).first()
+
+        if final_quiz:
+            return {"content": final_quiz.content}, 200
+        else:
+            quizzes = Quiz.query.filter_by(
+                user_id=user_id,
+                week_number=week_number,
+            ).order_by(Quiz.day_number.asc()).all()
+
+            if not quizzes:
+                return {
+                    "error": f"{username} kullanıcısına ait {week_number}. haftanın günlük testleri bulunamadı"}, 404
+            elif len(quizzes) < 6:  # Önceden 7'ydi, 6 olarak değiştirildi
+                return {
+                    "error": f"Henüz {week_number} haftasındaki tüm günlerin quizleri tamamlanmadığı için final testi oluşturulamaz"}, 409
+            elif len(quizzes) > 6:  # Önceden 7'ydi, 6 olarak değiştirildi
+                return {"error": f"Zaten {week_number} haftası için oluşturulmuş bir final testi var"}, 409
+
+            selection = "multi"
+            final_quiz_content = {"multi_choice": [], "sentences": []}
+
+            for quiz in quizzes:
+                content: dict[str, list] = quiz.content
+                multi_choice: list[dict] = content.get("multi_choice")
+                sentences: list[dict] = content.get("sentences")
+
+                for i in range(len(multi_choice)):
+                    if selection == "multi":
+                        final_quiz_content["multi_choice"].append(multi_choice[i])
+                        selection = "sentence"
+                    else:
+                        final_quiz_content["sentences"].append(sentences[i])
+                        selection = "multi"
+
+            final_quiz = Quiz(
+                user_id=user_id,
+                content=final_quiz_content,
+                week_number=week_number,
+                day_number=6,  # Final quiz 7. gün olduğu için indeksi 6 olacak (0, 1, 2, 3, 4, 5 -> günlükler)
+                final=True
+            )
+
+            db.session.add(final_quiz)
+            db.session.commit()
+
+            return {"content": final_quiz.content}, 200

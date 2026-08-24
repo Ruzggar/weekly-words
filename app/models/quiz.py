@@ -10,3 +10,4 @@ class Quiz(db.Model):
     content = db.Column(db.JSON, nullable=False)
     week_number = db.Column(db.Integer, nullable=False)
     day_number = db.Column(db.Integer, nullable=False)
+    final = db.Column(db.Boolean, nullable=False, default=False)

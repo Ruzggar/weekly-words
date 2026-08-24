@@ -14,6 +14,8 @@ class WeeklyWordsService:
         if not isinstance(words, list) or not isinstance(learning_language, str):
             return {"error": "Kelimeler liste, dil string olmalıdır"}, 400
 
+        # ileride buraya 100 kelimeden fazla bir liste gönderilmişse hata ver eklenebilir
+
         learning_language = learning_language.strip().lower()
         known_language = known_language.strip().lower()
         if learning_language not in ["tr", "en", "de", "el"] or known_language not in ["tr", "en", "de", "el"]:
@@ -49,6 +51,11 @@ class WeeklyWordsService:
                     return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (NoArticle)"}, 400
 
         last_week = WeeklyWords.query.filter_by(user_id=user_id).order_by(WeeklyWords.week_number.desc()).first()
+
+        # Quiz toplamı 8 yerine 7 olmalı (6 günlük quiz + 1 final)
+        if last_week and len(Quiz.query.filter_by(user_id=user_id, week_number=last_week.week_number).all()) == 7:
+            last_week.completed = True
+
         if last_week and not last_week.completed:
             return {"error": "Bir hafta tamamlanmamışken yenisine geçilemez"}, 409
 

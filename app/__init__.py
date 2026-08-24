@@ -92,5 +92,3 @@ def create_app():
             print(f"Temizlik yapıldı: {deleted_count} adet süresi dolmuş token/marker blocklist'ten silindi.")
 
     return app
-
-    return app

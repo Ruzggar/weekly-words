@@ -34,8 +34,8 @@ def get_weekly_words(week_number):
 @weekly_words_bp.route('/last-week-number', methods=['GET'])
 @jwt_required()
 def get_last_week_number():
-    username = get_jwt_identity()
-    user_id = get_jwt().get('id')
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
 
     result, status_code = WeeklyWordsService.get_last_week_number(username, user_id)
     return jsonify(result), status_code
