@@ -30,6 +30,7 @@ def create_app():
     from app.models.weekly_words import WeeklyWords
     from app.models.blocklist import TokenBlocklist
     from app.models.quiz import Quiz
+    from app.models.wrong_answers import WrongAnswers
 
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
@@ -67,10 +68,12 @@ def create_app():
     from app.controllers.auth_controller import auth_bp
     from app.controllers.weekly_words_controller import weekly_words_bp
     from app.controllers.quiz_controller import quiz_bp
+    from app.controllers.wrong_answers_controller import wrong_answers_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(weekly_words_bp)
     app.register_blueprint(quiz_bp)
+    app.register_blueprint(wrong_answers_bp)
 
     with app.app_context():
         db.create_all()

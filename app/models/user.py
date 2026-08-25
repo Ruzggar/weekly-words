@@ -9,6 +9,7 @@ class User(db.Model):
     # İLİŞKİLER (Relationships)
     # cascade="all, delete-orphan" -> Kullanıcı silinirse ona ait tüm verileri de otomatik siler
     weekly_words = db.relationship('WeeklyWords', backref='user', lazy=True, cascade="all, delete-orphan")
+    wrong_answers = db.relationship('WrongAnswers', backref='user', lazy=True, cascade="all, delete-orphan")
     quizzes = db.relationship('Quiz', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def set_password(self, password):
