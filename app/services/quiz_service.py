@@ -46,11 +46,12 @@ class QuizService:
         if not username or not user_id:
             return {"error": "Kullanıcı adı veya ID boş olamaz"}, 400
 
-        user = User.query.filter_by(id=user_id, username=username).first()
+        user = db.session.query(User).filter_by(id=user_id, username=username).first()
         if not user:
             return {"error": f"{username} isimli ve {user_id} id'li bir kullanıcı bulunamadı"}, 404
 
-        last_week = WeeklyWords.query.filter_by(user_id=user.id).order_by(WeeklyWords.week_number.desc()).first()
+        last_week = db.session.query(WeeklyWords).filter_by(user_id=user.id).order_by(
+            WeeklyWords.week_number.desc()).first()
         if not last_week:
             return {"error": f"{username} isimli ve {user_id} id'li kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
 
@@ -146,7 +147,7 @@ class QuizService:
 
     @staticmethod
     def get_quiz_content(user_id, username, week_number, day_number):
-        quiz = Quiz.query.filter_by(
+        quiz = db.session.query(Quiz).filter_by(
             user_id=user_id,
             week_number=week_number,
             day_number=day_number
@@ -162,7 +163,7 @@ class QuizService:
 
     @staticmethod
     def get_weekly_quizzes_content(user_id, username, week_number):
-        quizzes = Quiz.query.filter_by(
+        quizzes = db.session.query(Quiz).filter_by(
             user_id=user_id,
             week_number=week_number,
         ).order_by(Quiz.day_number.asc()).all()
@@ -187,8 +188,10 @@ class QuizService:
 
     @staticmethod
     def get_quiz_history(user_id, username):
-        last_quiz = Quiz.query.filter_by(user_id=user_id).order_by(desc(Quiz.week_number),
-                                                                   desc(Quiz.day_number)).first()
+        last_quiz = db.session.query(Quiz).filter_by(user_id=user_id).order_by(
+            desc(Quiz.week_number), desc(Quiz.day_number)
+        ).first()
+
         if not last_quiz:
             return {"error": f"{username} kullanıcısına ait son quiz bulunamadı"}, 404
         last_quiz_week = last_quiz.week_number
@@ -197,7 +200,7 @@ class QuizService:
 
     @staticmethod
     def get_or_generate_final_quiz(user_id, username, week_number):
-        final_quiz = Quiz.query.filter_by(
+        final_quiz = db.session.query(Quiz).filter_by(
             user_id=user_id,
             week_number=week_number,
             final=True
@@ -206,7 +209,7 @@ class QuizService:
         if final_quiz:
             return {"content": final_quiz.content}, 200
         else:
-            quizzes = Quiz.query.filter_by(
+            quizzes = db.session.query(Quiz).filter_by(
                 user_id=user_id,
                 week_number=week_number,
             ).order_by(Quiz.day_number.asc()).all()

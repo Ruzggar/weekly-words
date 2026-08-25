@@ -40,7 +40,7 @@ class WrongAnswersService:
                 "new": True
             })
 
-        present_wrong_answers = WrongAnswers.query.filter_by(
+        present_wrong_answers = db.session.query(WrongAnswers).filter_by(
             user_id=user_id,
             week_number=week_number,
             day_number=day_number
@@ -65,7 +65,7 @@ class WrongAnswersService:
 
     @staticmethod
     def get_wrong_answers_by_week_and_day(user_id, username, week_number, day_number):
-        wrong_answers = WrongAnswers.query.filter_by(
+        wrong_answers = db.session.query(WrongAnswers).filter_by(
             user_id=user_id,
             week_number=week_number,
             day_number=day_number
@@ -83,7 +83,7 @@ class WrongAnswersService:
         if filter_type not in ["all", "new", "old"]:
             return {"error": "Geçersiz filtre tipi. Sadece 'all', 'new' veya 'old' kullanılabilir."}, 400
 
-        all_wrong_answers = WrongAnswers.query.filter_by(
+        all_wrong_answers = db.session.query(WrongAnswers).filter_by(
             user_id=user_id,
         ).all()
 

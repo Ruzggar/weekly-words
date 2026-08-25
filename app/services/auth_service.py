@@ -11,7 +11,7 @@ class AuthService:
         if not username or not password:
             return {"error": "Kullanıcı adı ve şifre zorunludur"}, 400
 
-        if User.query.filter_by(username=username).first():
+        if db.session.query(User).filter_by(username=username).first():
             return {"error": "Bu kullanıcı adı zaten alınmış"}, 400
 
         new_user = User(username=username)
@@ -24,7 +24,7 @@ class AuthService:
 
     @staticmethod
     def login_user(username, password):
-        user = User.query.filter_by(username=username).first()
+        user = db.session.query(User).filter_by(username=username).first()
 
         if not user or not user.check_password(password):
             return {"error": "Hatalı kullanıcı adı veya şifre"}, 401
@@ -48,7 +48,7 @@ class AuthService:
 
     @staticmethod
     def delete_account(user_id, jti):
-        user = User.query.get(user_id)  # Artık ID ile arıyoruz
+        user = db.session.query(User).filter_by(id=user_id).first()
         if not user:
             return {"error": "Kullanıcı bulunamadı"}, 404
 
@@ -63,10 +63,10 @@ class AuthService:
         if not new_username:
             return {"error": "Yeni kullanıcı adı boş olamaz"}, 400
 
-        if User.query.filter_by(username=new_username).first():
+        if db.session.query(User).filter_by(username=new_username).first():
             return {"error": "Bu kullanıcı adı zaten alınmış"}, 400
 
-        user = User.query.get(user_id)
+        user = db.session.query(User).filter_by(id=user_id).first()
         if not user:
             return {"error": "Kullanıcı bulunamadı"}, 404
 
@@ -94,7 +94,7 @@ class AuthService:
         if not old_password or not new_password:
             return {"error": "Eski ve yeni şifre alanları zorunludur"}, 400
 
-        user = User.query.get(user_id)
+        user = db.session.query(User).filter_by(id=user_id).first()
 
         if not user or not user.check_password(old_password):
             return {"error": "Eski şifrenizi yanlış girdiniz"}, 401

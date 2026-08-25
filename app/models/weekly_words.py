@@ -14,3 +14,6 @@ class WeeklyWords(db.Model):
     last_generated_daily_quiz_number = db.Column(db.Integer, nullable=False, default=-1)
     last_completed_daily_quiz_number = db.Column(db.Integer, nullable=False, default=-1)
     completed = db.Column(db.Boolean, default=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

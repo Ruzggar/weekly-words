@@ -6,6 +6,9 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     # İLİŞKİLER (Relationships)
     # cascade="all, delete-orphan" -> Kullanıcı silinirse ona ait tüm verileri de otomatik siler
     weekly_words = db.relationship('WeeklyWords', backref='user', lazy=True, cascade="all, delete-orphan")

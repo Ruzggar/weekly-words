@@ -6,3 +6,6 @@ class WrongAnswers(db.Model):
     questions = db.Column(db.JSON, nullable=False)
     week_number = db.Column(db.Integer, nullable=False)
     day_number = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

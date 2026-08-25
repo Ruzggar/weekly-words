@@ -54,11 +54,11 @@ def create_app():
             if last_logout_all:
                 last_logout_date = last_logout_all[0]
 
-                # Token'ın oluşturulma zamanını UTC formatında datetime objesine çevir
-                # (jwt_payload["iat"] bize unix timestamp saniyesi verir)
+                # ÇÖZÜM BURADA: SQLite'tan gelen tarihe UTC bilgisini geri ekliyoruz
+                last_logout_date = last_logout_date.replace(tzinfo=timezone.utc)
+
                 token_iat = datetime.fromtimestamp(jwt_payload["iat"], timezone.utc)
 
-                # Eğer token, "tüm cihazlardan çıkış" emrinden ÖNCE oluşturulmuşsa artık geçersizdir
                 if token_iat < last_logout_date:
                     return True
 

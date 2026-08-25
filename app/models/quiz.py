@@ -11,3 +11,6 @@ class Quiz(db.Model):
     week_number = db.Column(db.Integer, nullable=False)
     day_number = db.Column(db.Integer, nullable=False)
     final = db.Column(db.Boolean, nullable=False, default=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
