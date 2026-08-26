@@ -1,13 +1,13 @@
 import random
 from typing import List
+
 from pydantic import BaseModel, Field
 from sqlalchemy import desc
 
 from app import extensions, db
-from app.models.user import User
 from app.models.quiz import Quiz
+from app.models.user import User
 from app.models.weekly_words import WeeklyWords
-from app.models.wrong_answers import WrongAnswers
 from app.services.wrong_answers_service import WrongAnswersService
 
 
@@ -57,7 +57,7 @@ class QuizService:
         if not last_week:
             return {"error": f"{username} isimli ve {user_id} id'li kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
 
-        # Eğer zaten o haftanın 7 testini de oluşturmuşsa engelle (0'dan 6'ya kadar indeksler)
+        # Eğer zaten o haftanın 6 testini de oluşturmuşsa engelle (0'dan 5'e kadar indeksler)
         if last_week.last_generated_daily_quiz_number >= 5:
             return {"error": "Bu haftanın tüm günlük testleri zaten oluşturulmuş"}, 409
 
@@ -67,7 +67,7 @@ class QuizService:
         last_weekly_words: List[dict] = last_week.words
         last_weekly_words_length = len(last_weekly_words)
 
-        # 1. Kelimeleri günlere adil dağıtma (Artık 7'ye değil 6'ya bölüyoruz)
+        # 1. Kelimeleri günlere adil dağıtma
         number_per_day = last_weekly_words_length // 6
         mod = last_weekly_words_length % 6
 
@@ -80,28 +80,27 @@ class QuizService:
 
         seed_string = f"user_{user_id}_week_{last_week.week_number}"
         local_random = random.Random(seed_string)
-
-        # Listeyi bu lokal obje ile karıştır
         local_random.shuffle(words_for_each_quiz)
 
-        # 2. Yeni test indeksini ve bu testte kullanılacak kelime sayısını belirleme
+        # 2. Yeni test indeksini ve kelime sayısını belirleme
         new_generated_daily_quiz_number = last_week.last_generated_daily_quiz_number + 1
-
         words_for_this_quiz = words_for_each_quiz[new_generated_daily_quiz_number]
 
-        # 3. Başlangıç indeksini doğru hesaplama
+        # 3. Başlangıç indeksini hesaplama
         start_word_index = 0
         for i in range(new_generated_daily_quiz_number):
             start_word_index += words_for_each_quiz[i]
 
-        # 4. Liste dilimleme (slicing'de -1 kullanılmaz)
+        # 4. Liste dilimleme
         target_words = last_weekly_words[start_word_index: start_word_index + words_for_this_quiz]
 
-        # Prompt hazırlığı
-        prompt = (
-            f"Target words and their details: {target_words}\n\n"
-            f"Learning Language: {last_week.learning_language}\n"
-            f"Known Language (for translations): {last_week.known_language}\n\n"
+        # =====================================================================
+        # 5. PROMPT'U SİSTEM VE KULLANICI OLARAK İKİYE BÖLME
+        # =====================================================================
+
+        # Sistem Talimatı (Yapay zekanın karakteri ve asla ihlal etmemesi gereken kurallar)
+        system_instruction = (
+            "You are a strict, expert language learning quiz generator.\n\n"
             "STRICT RULES:\n"
             "1. For each word and for EACH of its 'type' (part of speech), generate EXACTLY ONE multiple-choice question AND EXACTLY ONE example sentence pair.\n"
             "2. MULTI_CHOICE REQUIREMENTS:\n"
@@ -112,13 +111,22 @@ class QuizService:
             "   - 'sentence': Write a complete example sentence using the target word correctly in the Learning Language.\n"
             "   - 'translate': Translate this sentence accurately into the Known Language.\n"
             "4. Make sure to vary the lengths of all generated sentences across short (1-6 words), medium (7-11 words), and long (12-15 words).\n"
-            "5. The context of the sentences must align with the provided 'meaning' of the words.\n"
+            "5. The context of the sentences must align with the provided 'meaning' of the words."
+        )
+
+        # Kullanıcı Mesajı (Değişken veriler)
+        user_content = (
+            f"Learning Language: {last_week.learning_language}\n"
+            f"Known Language (for translations): {last_week.known_language}\n\n"
+            f"Target words and their details to process:\n{target_words}\n\n"
+            "Please generate the quiz content based on these words following your strict system rules."
         )
 
         response = extensions.genai_client.models.generate_content(
             model="gemini-3.5-flash-lite",
-            contents=prompt,
+            contents=user_content,  # Sadece kullanıcı içeriğini gönderiyoruz
             config={
+                "system_instruction": system_instruction,  # Kuralları sisteme yüklüyoruz
                 "response_mime_type": "application/json",
                 "response_schema": TestScheme,
                 "automatic_function_calling": {"disable": True},
@@ -130,7 +138,6 @@ class QuizService:
             quiz_content = result_dict.get("content", {})
             last_week_number = last_week.week_number
 
-            # 5. Eksik olan day_number alanı eklendi
             new_quiz = Quiz(
                 user_id=user_id,
                 content=quiz_content,

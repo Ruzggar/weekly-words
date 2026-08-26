@@ -1,6 +1,6 @@
 from app.extensions import db
-from app.models.weekly_words import WeeklyWords
 from app.models.quiz import Quiz
+from app.models.weekly_words import WeeklyWords
 
 
 class WeeklyWordsService:

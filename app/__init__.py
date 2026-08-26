@@ -1,7 +1,9 @@
-from datetime import timedelta, timezone, datetime
-from flask import Flask
-from app.extensions import db, jwt
 import os
+from datetime import timedelta, timezone, datetime
+
+from flask import Flask
+
+from app.extensions import db, jwt
 
 
 def create_app():

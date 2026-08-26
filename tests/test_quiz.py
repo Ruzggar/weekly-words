@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from tests.test_weekly_words import test_add_weekly_words
 
 

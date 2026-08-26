@@ -1,7 +1,8 @@
+from flask_jwt_extended import create_access_token
+
+from app.extensions import db
 from app.models.blocklist import TokenBlocklist
 from app.models.user import User
-from app.extensions import db
-from flask_jwt_extended import create_access_token
 
 
 class AuthService:

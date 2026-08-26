@@ -1,6 +1,7 @@
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.extensions import db
 from app.models.wrong_answers import WrongAnswers
-from sqlalchemy.orm.attributes import flag_modified
 from tests.test_weekly_words import test_add_weekly_words
 
 

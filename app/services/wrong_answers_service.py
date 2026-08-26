@@ -1,9 +1,10 @@
+import random
+
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
 from app.models.user import User
 from app.models.wrong_answers import WrongAnswers
-import random
 
 
 class WrongAnswersService:
@@ -54,6 +55,8 @@ class WrongAnswersService:
             existing_questions = list(present_wrong_answers.questions)
             existing_questions.extend(processed_questions)
             present_wrong_answers.questions = existing_questions
+
+            flag_modified(present_wrong_answers, "questions")
         else:
             new_wrong_answers = WrongAnswers(
                 user_id=user_id,
@@ -196,25 +199,31 @@ class WrongAnswersService:
 
         changed_any = False
 
-        # 3. Kayıtları ve soruları tarayıp eşleşenlerin "new" statüsünü False yapma
+        # 3. Kayıtları ve soruları tarama optimizasyonu
         for record in records_to_process:
             record_changed = False
             updated_questions = list(record.questions)
 
-            for target_q in questions_to_change:
-                t_type = target_q.get("question_type")
-                t_content = target_q.get("question_content")
+            # OPTİMİZASYON 1: Döngülerin sırasını değiştirdik. Önce DB'deki soruları dönüyoruz.
+            for db_q in updated_questions:
 
-                for db_q in updated_questions:
+                # OPTİMİZASYON 2: Eğer soru zaten "new": False ise, hedef listeyle hiç kıyaslama (Hızlı Eleme)
+                if db_q.get("new", False) is False:
+                    continue
+
+                for target_q in questions_to_change:
                     # Soru tipi ve içeriği birebir eşleşiyorsa
-                    if db_q.get("question_type") == t_type and db_q.get("question_content") == t_content:
-                        # Eğer hala "new" statüsündeyse False yap
-                        if db_q.get("new", False) is not False:
-                            db_q["new"] = False
-                            record_changed = True
-                            changed_any = True
+                    if (db_q.get("question_type") == target_q.get("question_type") and
+                            db_q.get("question_content") == target_q.get("question_content")):
+                        db_q["new"] = False
+                        record_changed = True
+                        changed_any = True
 
-            # Eğer bu kaydın içindeki herhangi bir soruda değişiklik yapıldıysa JSON verisini güncelle
+                        # OPTİMİZASYON 3: Eşleşme bulundu ve soru "old" yapıldı.
+                        # Bu soru için diğer hedeflere bakmaya gerek yok, döngüyü kırıp sıradaki DB sorusuna geçiyoruz.
+                        break
+
+                        # Eğer bu kaydın içindeki herhangi bir soruda değişiklik yapıldıysa JSON verisini güncelle
             if record_changed:
                 record.questions = updated_questions
                 flag_modified(record, "questions")
