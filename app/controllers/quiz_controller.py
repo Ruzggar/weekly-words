@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from app.services.quiz_service import QuizService
@@ -58,5 +58,18 @@ def get_or_generate_final_quiz(week_number):
     username = get_jwt().get('username')
 
     result, status_code = QuizService.get_or_generate_final_quiz(user_id, username, week_number)
+
+    return jsonify(result), status_code
+
+
+@quiz_bp.route('/quiz-completed', methods=['POST'])
+@jwt_required()
+def quiz_completed():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    data = request.get_json()
+
+    result, status_code = QuizService.quiz_completed(user_id, username, data)
 
     return jsonify(result), status_code

@@ -45,3 +45,14 @@ def test_final_quiz_cannot_be_generated_early(client, auth_headers):
     # 6 günlük test tamamlanmadan final testi istenirse 409 dönmeli
     response = client.get('/final-quiz/1', headers=auth_headers)
     assert response.status_code == 404  # Henüz hiç günlük test olmadığı için önce 404'e düşer
+
+
+def test_quiz_completed_without_wrong_answers(client, auth_headers):
+    test_add_weekly_words(client, auth_headers)
+
+    # İçinde "questions" listesi olmayan, sadece haftayı belirten data
+    data = {"week_number": 1}
+    response = client.post('/quiz-completed', json=data, headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.get_json()["msg"] == "Quiz tamamlanması başarıyla işlendi"

@@ -7,12 +7,14 @@ from app import extensions, db
 from app.models.user import User
 from app.models.quiz import Quiz
 from app.models.weekly_words import WeeklyWords
+from app.models.wrong_answers import WrongAnswers
+from app.services.wrong_answers_service import WrongAnswersService
 
 
 # Çoktan seçmeli soru yapısı
 class MultiChoiceItem(BaseModel):
     question_sentence: str = Field(
-        description="A question sentence in the learning language containing a blank space (_____) (without the parentheses) where the target word should be.")
+        description="A question sentence in the learning language containing a blank space consisting of EXACTLY FIVE underscores (_____) (without the parentheses) where the target word should be.")
     options: List[str] = Field(
         description="Exactly 4 options, including one correct answer and three plausible distractors.", min_length=4,
         max_length=4)
@@ -103,7 +105,7 @@ class QuizService:
             "STRICT RULES:\n"
             "1. For each word and for EACH of its 'type' (part of speech), generate EXACTLY ONE multiple-choice question AND EXACTLY ONE example sentence pair.\n"
             "2. MULTI_CHOICE REQUIREMENTS:\n"
-            "   - 'question_sentence': Write a sentence in the Learning Language with a blank (e.g., '_____') where the target word belongs.\n"
+            "   - 'question_sentence': Write a sentence in the Learning Language with a blank space consisting of EXACTLY FIVE UNDERSCORES (_____) (without the parentheses) where the target word belongs. DO NOT use fewer or more than 5 underscores.\n"
             "   - 'options': Provide exactly 4 options. One must be the correct target word. The other 3 must be plausible distractors in the Learning Language.\n"
             "   - 'correct_option_index': Provide the integer index (0, 1, 2, or 3) indicating where the correct answer is in the 'options' list.\n"
             "3. SENTENCES REQUIREMENTS:\n"
@@ -251,3 +253,30 @@ class QuizService:
             db.session.commit()
 
             return {"content": final_quiz.content}, 200
+
+    @staticmethod
+    def quiz_completed(user_id, username, data):
+        week_number = data.get("week_number")
+        if not week_number:
+            return {"error": "Hafta numarası boş olamaz"}, 400
+
+        weekly_words_of_quiz = db.session.query(WeeklyWords).filter_by(
+            user_id=user_id, week_number=week_number).first()
+
+        if weekly_words_of_quiz and weekly_words_of_quiz.last_completed_daily_quiz_number != 6:
+            weekly_words_of_quiz.last_completed_daily_quiz_number += 1
+        elif not weekly_words_of_quiz:
+            return {"error": f"{username} kullanıcısına ait {week_number}. haftaya ait quiz bulunamadı"}, 404
+
+        questions_of_wrong_answers = data.get("questions")
+
+        if not questions_of_wrong_answers:
+            db.session.commit()
+            return {"msg": "Quiz tamamlanması başarıyla işlendi"}, 200
+
+        result, status_code = WrongAnswersService.add_wrong_answers(user_id, username, data)
+
+        if result.get("msg") and status_code == 201:
+            return {"msg": "Quiz tamamlanması başarıyla işlendi ve yanlış cevap verilen sorular başarıyla eklendi"}, 200
+        else:
+            return result, status_code
