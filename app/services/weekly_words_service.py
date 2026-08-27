@@ -30,7 +30,7 @@ class WeeklyWordsService:
 
             if not w_word or not isinstance(w_word, str) or not w_meaning or not isinstance(w_meaning,
                                                                                             str) or not w_type or not isinstance(
-                    w_type, list):
+                w_type, list):
                 return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (TypeError)"}, 400
 
             w_word = w_word.strip()
@@ -92,6 +92,17 @@ class WeeklyWordsService:
                     "error": f"{username} kullanıcısına ait en son hafta bulunamadı"}, 404
 
         return {"words": weekly_words_of_user.words}, 200
+
+    @staticmethod
+    def get_all_weekly_words(username, user_id):
+        all_weekly_words_of_user = db.session.query(WeeklyWords).filter_by(user_id=user_id).order_by(
+            WeeklyWords.week_number.asc()).all()
+        if not all_weekly_words_of_user:
+            return {"error": f"{username} kullanıcısına ait herhangi bir haftalık kelime bulunamadı"}, 404
+
+        all_words = {weekly_word.week_number: weekly_word.words for weekly_word in all_weekly_words_of_user}
+
+        return {"all_weekly_words": all_words}, 200
 
     @staticmethod
     def get_last_week_number(username, user_id):

@@ -59,3 +59,13 @@ def change_wrong_answers_status():
 
     result, status_code = WrongAnswersService.change_wrong_answers_status(user_id, username, data)
     return jsonify(result), status_code
+
+
+@wrong_answers_bp.route('/wrong-answers-info', methods=['GET'])
+@jwt_required()
+def get_wrong_answers_info():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = WrongAnswersService.get_wrong_answers_info(user_id, username)
+    return jsonify(result), status_code

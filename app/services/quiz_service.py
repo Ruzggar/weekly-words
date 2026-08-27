@@ -196,7 +196,7 @@ class QuizService:
                 "error": f"{username} kullanıcısına ait {week_number}. haftanın günlük testleri bulunamadı"}, 404
 
     @staticmethod
-    def get_quiz_history(user_id, username):
+    def get_last_generated_quiz(user_id, username):
         last_quiz = db.session.query(Quiz).filter_by(user_id=user_id).order_by(
             desc(Quiz.week_number), desc(Quiz.day_number)
         ).first()
@@ -206,6 +206,26 @@ class QuizService:
         last_quiz_week = last_quiz.week_number
         last_quiz_day = last_quiz.day_number
         return {"last_quiz_week": last_quiz_week, "last_quiz_day": last_quiz_day}, 200
+
+    @staticmethod
+    def get_last_completed_quiz(user_id, username):
+        last_two_weekly_words = db.session.query(WeeklyWords).filter_by(
+            user_id=user_id
+        ).order_by(WeeklyWords.week_number.desc()).limit(2).all()
+
+        if not last_two_weekly_words:
+            return {"error": "Kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
+
+        # Liste 1 elemanlı da olsa, 2 elemanlı da olsa döngü sırayla (en yeniden eskiye) kontrol eder.
+        for weekly_words in last_two_weekly_words:
+            if weekly_words.last_completed_daily_quiz_number != -1:
+                return {
+                    "last_quiz_week": weekly_words.week_number,
+                    "last_quiz_day": weekly_words.last_completed_daily_quiz_number
+                }, 200
+
+        return {
+            "error": "Kullanıcının tamamladığı herhangi bir quiz bulunamadı veya birden çok tamamlanmamış hafta mevcut"}, 404
 
     @staticmethod
     def get_or_generate_final_quiz(user_id, username, week_number):
@@ -226,10 +246,10 @@ class QuizService:
             if not quizzes:
                 return {
                     "error": f"{username} kullanıcısına ait {week_number}. haftanın günlük testleri bulunamadı"}, 404
-            elif len(quizzes) < 6:  # Önceden 7'ydi, 6 olarak değiştirildi
+            elif len(quizzes) < 6:
                 return {
                     "error": f"Henüz {week_number} haftasındaki tüm günlerin quizleri tamamlanmadığı için final testi oluşturulamaz"}, 409
-            elif len(quizzes) > 6:  # Önceden 7'ydi, 6 olarak değiştirildi
+            elif len(quizzes) > 6:
                 return {"error": f"Zaten {week_number} haftası için oluşturulmuş bir final testi var"}, 409
 
             selection = "multi"

@@ -81,4 +81,4 @@ def logout_all():
     user_id = get_jwt_identity()
 
     result, status_code = AuthService.logout_all_sessions(user_id)
-    return jsonify(result), status_code 
+    return jsonify(result), status_code

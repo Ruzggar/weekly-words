@@ -234,3 +234,32 @@ class WrongAnswersService:
             return {"msg": "Belirtilen soruların statüsü başarıyla (old olarak) güncellendi"}, 200
         else:
             return {"msg": "Değiştirilecek veya eşleşen 'new' statüsünde soru bulunamadı"}, 200
+
+    @staticmethod
+    def get_wrong_answers_info(user_id, username):
+        all_wrong_answers = db.session.query(WrongAnswers).filter_by(user_id=user_id).all()
+
+        # 1. HATA ÇÖZÜMÜ: Statü kodu (404) eklendi
+        if not all_wrong_answers:
+            return {"error": f"{username} kullanıcısına ait herhangi bir yanlış yapılan soru bulunamadı."}, 404
+
+        new_question_count = 0
+        old_question_count = 0
+
+        for record in all_wrong_answers:
+            # 2. OPTİMİZASYON: list() çevirisi kaldırıldı, doğrudan üzerinde dönüyoruz
+            for question in record.questions:
+
+                # 3. OPTİMİZASYON: Daha temiz ve hızlı boolean kontrolü
+                if question.get("new", False):
+                    new_question_count += 1
+                else:
+                    old_question_count += 1
+
+        total_question_count = new_question_count + old_question_count
+
+        return {
+            "new_question_count": new_question_count,
+            "old_question_count": old_question_count,
+            "total_question_count": total_question_count
+        }, 200

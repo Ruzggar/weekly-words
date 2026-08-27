@@ -18,7 +18,7 @@ def generate_quiz():
     return jsonify(result), status_code
 
 
-@quiz_bp.route('/get-quiz-content/<int:week_number>/<int:day_number>', methods=['GET'])
+@quiz_bp.route('/quiz-content/<int:week_number>/<int:day_number>', methods=['GET'])
 @jwt_required()
 def get_quiz_content(week_number, day_number):
     user_id = get_jwt_identity()
@@ -29,7 +29,7 @@ def get_quiz_content(week_number, day_number):
     return jsonify(result), status_code
 
 
-@quiz_bp.route('/get-quiz-content/<int:week_number>', methods=['GET'])
+@quiz_bp.route('/quiz-content/<int:week_number>', methods=['GET'])
 @jwt_required()
 def get_weekly_quizzes_content(week_number):
     user_id = get_jwt_identity()
@@ -40,13 +40,24 @@ def get_weekly_quizzes_content(week_number):
     return jsonify(result), status_code
 
 
-@quiz_bp.route('/get-quiz-history', methods=['GET'])
+@quiz_bp.route('/last-generated-quiz', methods=['GET'])
 @jwt_required()
-def get_quiz_history():
+def get_last_generated_quiz():
     user_id = get_jwt_identity()
     username = get_jwt().get('username')
 
-    result, status_code = QuizService.get_quiz_history(user_id, username)
+    result, status_code = QuizService.get_last_generated_quiz(user_id, username)
+
+    return jsonify(result), status_code
+
+
+@quiz_bp.route('/last-completed-quiz', methods=['GET'])
+@jwt_required()
+def get_last_completed_quiz():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = QuizService.get_last_completed_quiz(user_id, username)
 
     return jsonify(result), status_code
 

@@ -5,6 +5,7 @@ from app.services.weekly_words_service import WeeklyWordsService
 
 weekly_words_bp = Blueprint('weekly_words', __name__)
 
+
 @weekly_words_bp.route('/add-weekly-words', methods=['POST'])
 @jwt_required()
 def add_weekly_words():
@@ -16,7 +17,8 @@ def add_weekly_words():
     learning_language = data.get('learning_language')
     known_language = data.get('known_language')
 
-    result, status_code = WeeklyWordsService.add_weekly_words(username, user_id, words, learning_language, known_language)
+    result, status_code = WeeklyWordsService.add_weekly_words(username, user_id, words, learning_language,
+                                                              known_language)
 
     return jsonify(result), status_code
 
@@ -31,6 +33,7 @@ def get_weekly_words(week_number):
     result, status_code = WeeklyWordsService.get_weekly_words(username, user_id, week_number)
     return jsonify(result), status_code
 
+
 @weekly_words_bp.route('/last-week-number', methods=['GET'])
 @jwt_required()
 def get_last_week_number():
@@ -38,4 +41,14 @@ def get_last_week_number():
     username = get_jwt().get('username')
 
     result, status_code = WeeklyWordsService.get_last_week_number(username, user_id)
+    return jsonify(result), status_code
+
+
+@weekly_words_bp.route('/all-weekly-words', methods=['GET'])
+@jwt_required()
+def get_all_weekly_words():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = WeeklyWordsService.get_all_weekly_words(username, user_id)
     return jsonify(result), status_code
