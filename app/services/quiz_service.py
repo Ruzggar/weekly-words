@@ -1,3 +1,4 @@
+import copy
 import random
 from typing import List
 
@@ -57,7 +58,6 @@ class QuizService:
         if not last_week:
             return {"error": f"{username} isimli ve {user_id} id'li kullanıcıya ait herhangi bir hafta bulunamadı"}, 404
 
-        # Eğer zaten o haftanın 6 testini de oluşturmuşsa engelle (0'dan 5'e kadar indeksler)
         if last_week.last_generated_daily_quiz_number >= 5:
             return {"error": "Bu haftanın tüm günlük testleri zaten oluşturulmuş"}, 409
 
@@ -91,14 +91,34 @@ class QuizService:
         for i in range(new_generated_daily_quiz_number):
             start_word_index += words_for_each_quiz[i]
 
-        # 4. Liste dilimleme
-        target_words = last_weekly_words[start_word_index: start_word_index + words_for_this_quiz]
+        # 4. Liste dilimleme ve AYRI AYRI %25 İHTİMAL HESAPLAMASI
+        target_words = copy.deepcopy(last_weekly_words[start_word_index: start_word_index + words_for_this_quiz])
+
+        for w in target_words:
+            if "noun" in w.get("type", []):
+                # Her iki output (çoktan seçmeli ve cümle) için ayrı ayrı %25 zar atıyoruz
+                mc_plural = random.random() < 0.25
+                sentence_plural = random.random() < 0.25
+
+                # Eğer ikisi birden tutarsa, "en fazla birinde olabilir" kuralını korumak için rastgele birini iptal ediyoruz
+                if mc_plural and sentence_plural:
+                    if random.choice([True, False]):
+                        mc_plural = False
+                    else:
+                        sentence_plural = False
+
+                # Yapay zekaya nokta atışı emir veriyoruz
+                if mc_plural:
+                    w["regular_plural_instruction"] = "use_plural_in_multi_choice"
+                elif sentence_plural:
+                    w["regular_plural_instruction"] = "use_plural_in_sentence"
+                else:
+                    w["regular_plural_instruction"] = "use_singular_only"
 
         # =====================================================================
         # 5. PROMPT'U SİSTEM VE KULLANICI OLARAK İKİYE BÖLME
         # =====================================================================
 
-        # Sistem Talimatı (Yapay zekanın karakteri ve asla ihlal etmemesi gereken kurallar)
         system_instruction = (
             "You are a strict, expert language learning quiz generator.\n\n"
             "STRICT RULES:\n"
@@ -111,10 +131,16 @@ class QuizService:
             "   - 'sentence': Write a complete example sentence using the target word correctly in the Learning Language.\n"
             "   - 'translate': Translate this sentence accurately into the Known Language.\n"
             "4. Make sure to vary the lengths of all generated sentences across short (1-6 words), medium (7-11 words), and long (12-15 words).\n"
-            "5. The context of the sentences must align with the provided 'meaning' of the words."
+            "5. The context of the sentences must align with the provided 'meaning' of the words.\n"
+            "6. PLURAL NOUNS:\n"
+            "   - For IRREGULAR plurals (e.g., mouse/mice, person/people): You MUST use the plural form instead of the singular in EXACTLY ONE of the two generated outputs (either in the multiple-choice question OR in the example sentence).\n"
+            "   - For REGULAR plurals: Check the 'regular_plural_instruction' flag in the JSON details. \n"
+            "     * If it is 'use_plural_in_multi_choice', use the plural form ONLY in the multiple-choice question.\n"
+            "     * If it is 'use_plural_in_sentence', use the plural form ONLY in the example sentence.\n"
+            "     * If it is 'use_singular_only' (or missing), use ONLY the singular form in both outputs.\n"
+            "   - STRICT LIMIT: For any single target word, NEVER use the plural form in both of its generated outputs."
         )
 
-        # Kullanıcı Mesajı (Değişken veriler)
         user_content = (
             f"Learning Language: {last_week.learning_language}\n"
             f"Known Language (for translations): {last_week.known_language}\n\n"
@@ -124,9 +150,9 @@ class QuizService:
 
         response = extensions.genai_client.models.generate_content(
             model="gemini-3.5-flash-lite",
-            contents=user_content,  # Sadece kullanıcı içeriğini gönderiyoruz
+            contents=user_content,
             config={
-                "system_instruction": system_instruction,  # Kuralları sisteme yüklüyoruz
+                "system_instruction": system_instruction,
                 "response_mime_type": "application/json",
                 "response_schema": TestScheme,
                 "automatic_function_calling": {"disable": True},

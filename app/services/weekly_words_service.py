@@ -5,20 +5,38 @@ from app.models.weekly_words import WeeklyWords
 
 class WeeklyWordsService:
     @staticmethod
-    def add_weekly_words(username, user_id, words, learning_language, known_language):
+    def add_weekly_words(username, user_id, data):
+        words = data.get('words')
+        learning_language = data.get('learning_language')
+        known_language = data.get('known_language')
+
         if not username or not user_id:
             return {"error": "Kullanıcı adı veya ID boş olamaz"}, 400
+
+        last_week = db.session.query(WeeklyWords).filter_by(user_id=user_id).order_by(
+            WeeklyWords.week_number.desc()).first()
+
+        if last_week and db.session.query(Quiz).filter_by(
+                user_id=user_id, week_number=last_week.week_number).count() == 7:
+            last_week.completed = True
+
+        if last_week and not last_week.completed:
+            return {"error": "Bir hafta tamamlanmamışken yenisine geçilemez"}, 409
+
+        new_week_number = last_week.week_number + 1 if last_week else 1
 
         if not words:
             return {"error": "Kelimeler boş olamaz"}, 400
 
-        if not isinstance(words, list) or not isinstance(learning_language, str):
-            return {"error": "Kelimeler liste, dil string olmalıdır"}, 400
+        if not isinstance(words, list) or not isinstance(learning_language, str) or not isinstance(known_language, str):
+            return {"error": "Kelimeler liste, diller string olmalıdır"}, 400
 
         learning_language = learning_language.strip().lower()
         known_language = known_language.strip().lower()
         if learning_language not in ["tr", "en", "de", "el"] or known_language not in ["tr", "en", "de", "el"]:
             return {"error": "Desteklenen diller: tr, en, de, el"}, 400
+
+        processed_words = []
 
         for word_dict in words:
             if not isinstance(word_dict, dict):
@@ -41,30 +59,36 @@ class WeeklyWordsService:
             word_dict["word"] = w_word
             word_dict["meaning"] = w_meaning
 
-            for t in w_type:
-                pass
+            if "noun" in w_type:
+                w_plural = word_dict.get("plural")
+                if not w_plural or not isinstance(w_plural, str):
+                    return {
+                        "error": "İsim (noun) türündeki kelimeler için 'plural' (çoğul) alanı doğru doldurulmalıdır"}, 400
+                w_plural = w_plural.strip()
+                if not w_plural:
+                    return {"error": "Çoğul (plural) alanı boş bırakılamaz"}, 400
+                word_dict["plural"] = w_plural
 
-            if learning_language in ["de", "el"] and "noun" in w_type:
-                if not word_dict.get("article") or not isinstance(word_dict.get("article"), str):
-                    return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (NoArticle)"}, 400
+                if learning_language in ["de", "el"]:
+                    w_article = word_dict.get("article")
+                    if not w_article or not isinstance(w_article, str):
+                        return {"error": "Words için gerekli tüm alanlar doğru doldurulmalıdır (NoArticle)"}, 400
+                    word_dict["article"] = w_article.strip()
 
-        last_week = db.session.query(WeeklyWords).filter_by(user_id=user_id).order_by(
-            WeeklyWords.week_number.desc()).first()
+            meanings = [m.strip() for m in w_meaning.split('/') if m.strip()]
 
-        # Quiz toplamı 8 yerine 7 olmalı (6 günlük quiz + 1 final)
-        if last_week and len(
-                db.session.query(Quiz).filter_by(user_id=user_id, week_number=last_week.week_number).all()) == 7:
-            last_week.completed = True
+            if not meanings:
+                return {"error": "Anlam alanı sadece slash veya boşluklardan oluşamaz"}, 400
 
-        if last_week and not last_week.completed:
-            return {"error": "Bir hafta tamamlanmamışken yenisine geçilemez"}, 409
-
-        new_week_number = last_week.week_number + 1 if last_week else 1
+            for mean in meanings:
+                new_word_dict = word_dict.copy()
+                new_word_dict["meaning"] = mean
+                processed_words.append(new_word_dict)
 
         weekly_words = WeeklyWords(
             user_id=user_id,
             week_number=new_week_number,
-            words=words,
+            words=processed_words,
             learning_language=learning_language,
             known_language=known_language
         )

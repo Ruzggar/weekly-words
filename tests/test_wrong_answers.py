@@ -1,12 +1,15 @@
 from sqlalchemy.orm.attributes import flag_modified
-
 from app.extensions import db
 from app.models.wrong_answers import WrongAnswers
 from tests.test_weekly_words import test_add_weekly_words
 
 
 def add_dummy_wrong_answer(client, auth_headers):
+    """Testler içinde kullanmak için yardımcı fonksiyon."""
+    # 1. Önce WeeklyWords oluşturmamız lazım ki quiz_completed 404 dönmesin
     test_add_weekly_words(client, auth_headers)
+
+    # 2. Şimdi quiz-completed endpoint'ine istek atalım.
     data = {
         "week_number": 1,
         "day_number": 2,
@@ -37,6 +40,8 @@ def test_get_wrong_answers_by_week_and_day(client, auth_headers):
     assert len(response.get_json()["questions"]) == 1
 
 
+# ================= FİLTRE TESTLERİ =================
+
 def test_get_wrong_answers_filter_all(client, auth_headers):
     add_dummy_wrong_answer(client, auth_headers)
     response = client.get('/wrong-answers/all', headers=auth_headers)
@@ -55,6 +60,7 @@ def test_get_wrong_answers_filter_new(client, auth_headers):
 
 def test_get_wrong_answers_filter_old(client, auth_headers, app):
     add_dummy_wrong_answer(client, auth_headers)
+
     response_empty = client.get('/wrong-answers/old', headers=auth_headers)
     assert response_empty.status_code == 404
 
@@ -78,6 +84,8 @@ def test_invalid_filter_type(client, auth_headers):
     response = client.get('/wrong-answers/invalid_filter', headers=auth_headers)
     assert response.status_code == 404
 
+
+# ================= YENİ EKLENEN ENDPOINT TESTLERİ =================
 
 def test_generate_wrong_answers_quiz_success(client, auth_headers):
     add_dummy_wrong_answer(client, auth_headers)

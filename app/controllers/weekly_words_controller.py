@@ -13,12 +13,8 @@ def add_weekly_words():
 
     user_id = get_jwt_identity()
     username = get_jwt().get('username')
-    words = data.get('words')
-    learning_language = data.get('learning_language')
-    known_language = data.get('known_language')
 
-    result, status_code = WeeklyWordsService.add_weekly_words(username, user_id, words, learning_language,
-                                                              known_language)
+    result, status_code = WeeklyWordsService.add_weekly_words(username, user_id, data)
 
     return jsonify(result), status_code
 
