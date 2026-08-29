@@ -165,3 +165,68 @@ def test_get_wrong_answers_info(client, auth_headers):
     assert data["total_question_count"] == 1
     assert data["new_question_count"] == 1
     assert data["old_question_count"] == 0
+
+
+def test_add_wrong_answers_sentence_invalid_subtype(client, auth_headers):
+    test_add_weekly_words(client, auth_headers)
+    data = {
+        "week_number": 1,
+        "day_number": 2,
+        "questions": [
+            {
+                "question_type": "sentence",
+                "sub_type": "invalid_type_here",
+                "question_content": {
+                    "sentence": "I go to school",
+                    "translate": "Okula giderim"
+                }
+            }
+        ]
+    }
+    # Geçersiz sub_type gönderildiğinde hata (400) dönmeli
+    response = client.post('/quiz-completed', json=data, headers=auth_headers)
+    assert response.status_code == 400
+    assert "sub_type" in response.get_json()["error"]
+
+
+def test_add_wrong_answers_sentence_missing_subtype(client, auth_headers):
+    test_add_weekly_words(client, auth_headers)
+    data = {
+        "week_number": 1,
+        "day_number": 2,
+        "questions": [
+            {
+                "question_type": "sentence",
+                # sub_type eksik gönderiliyor
+                "question_content": {
+                    "sentence": "I go to school",
+                    "translate": "Okula giderim"
+                }
+            }
+        ]
+    }
+    # Eksik sub_type gönderildiğinde hata (400) dönmeli
+    response = client.post('/quiz-completed', json=data, headers=auth_headers)
+    assert response.status_code == 400
+    assert "sub_type" in response.get_json()["error"]
+
+
+def test_add_wrong_answers_sentence_valid_subtype(client, auth_headers):
+    test_add_weekly_words(client, auth_headers)
+    data = {
+        "week_number": 1,
+        "day_number": 2,
+        "questions": [
+            {
+                "question_type": "sentence",
+                "sub_type": "sentence_building",  # Geçerli tip
+                "question_content": {
+                    "sentence": "I go to school",
+                    "translate": "Okula giderim"
+                }
+            }
+        ]
+    }
+    # Geçerli sub_type gönderildiğinde başarılı (200) olmalı (controller üzerinden döndüğü için 200 döner)
+    response = client.post('/quiz-completed', json=data, headers=auth_headers)
+    assert response.status_code == 200

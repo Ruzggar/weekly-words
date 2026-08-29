@@ -39,11 +39,21 @@ class WrongAnswersService:
             if not question_type or not question_content:
                 return {"error": "Sorulardan en az birinin tipi veya içeriği eksik"}, 400
 
-            processed_questions.append({
+            processed_item = {
                 "question_type": question_type,
                 "question_content": question_content,
                 "new": True
-            })
+            }
+
+            # YENİ EKLENEN SUB_TYPE MANTIĞI
+            if question_type == "sentence":
+                sub_type = item.get("sub_type")
+                if sub_type not in ["listening", "sentence_building"]:
+                    return {
+                        "error": "question_type 'sentence' olan kayıtların 'sub_type' alanı 'listening' veya 'sentence_building' olmak zorundadır."}, 400
+                processed_item["sub_type"] = sub_type
+
+            processed_questions.append(processed_item)
 
         present_wrong_answers = db.session.query(WrongAnswers).filter_by(
             user_id=user_id,
@@ -79,7 +89,6 @@ class WrongAnswersService:
         ).first()
 
         if wrong_answers:
-            # EKLENDİ: Başarı durumunda 200 kodu eksikti.
             return {"questions": wrong_answers.questions}, 200
         else:
             return {
@@ -135,7 +144,6 @@ class WrongAnswersService:
 
         filtered_questions = []
 
-        # 1. Filtreye uyan tüm soruları düz bir liste (havuz) haline getirme
         for record in all_wrong_answers:
             for question in record.questions:
                 is_new = question.get("new", False)
@@ -150,11 +158,9 @@ class WrongAnswersService:
         if not filtered_questions:
             return {"error": f"Seçilen filtreye ({filter_type}) uygun soru bulunamadı"}, 404
 
-        # 2. Havuzdan rastgele soru seçme (Eğer havuzdaki soru sayısı istenenden azsa, olanların tamamını alır)
         sample_size = min(question_count, len(filtered_questions))
         selected_questions = random.sample(filtered_questions, sample_size)
 
-        # 3. Seçilen soruları TestScheme / QuizContent (Yapay Zeka) formatına dönüştürme
         quiz_content = {"multi_choice": [], "sentences": []}
 
         for q in selected_questions:
@@ -164,6 +170,7 @@ class WrongAnswersService:
             if q_type == "multi_choice":
                 quiz_content["multi_choice"].append(q_content)
             elif q_type == "sentence":
+                q_content["sub_type"] = q.get("sub_type")
                 quiz_content["sentences"].append(q_content)
 
         return {"content": quiz_content}, 200
@@ -182,14 +189,12 @@ class WrongAnswersService:
 
         records_to_process = []
 
-        # 1. Durum: week ve day verilmişse sadece o spesifik kaydı bul
         if week_number is not None and day_number is not None:
             record = db.session.query(WrongAnswers).filter_by(
                 user_id=user_id, week_number=week_number, day_number=day_number
             ).first()
             if record:
                 records_to_process.append(record)
-        # 2. Durum: week ve day yoksa kullanıcının tüm kayıtlarını taramak üzere listeye ekle
         else:
             records = db.session.query(WrongAnswers).filter_by(user_id=user_id).all()
             records_to_process.extend(records)
@@ -199,36 +204,32 @@ class WrongAnswersService:
 
         changed_any = False
 
-        # 3. Kayıtları ve soruları tarama optimizasyonu
         for record in records_to_process:
             record_changed = False
             updated_questions = list(record.questions)
 
-            # OPTİMİZASYON 1: Döngülerin sırasını değiştirdik. Önce DB'deki soruları dönüyoruz.
             for db_q in updated_questions:
-
-                # OPTİMİZASYON 2: Eğer soru zaten "new": False ise, hedef listeyle hiç kıyaslama (Hızlı Eleme)
                 if db_q.get("new", False) is False:
                     continue
 
                 for target_q in questions_to_change:
-                    # Soru tipi ve içeriği birebir eşleşiyorsa
-                    if (db_q.get("question_type") == target_q.get("question_type") and
-                            db_q.get("question_content") == target_q.get("question_content")):
+                    is_match = (db_q.get("question_type") == target_q.get("question_type") and
+                                db_q.get("question_content") == target_q.get("question_content"))
+
+                    if is_match and db_q.get("question_type") == "sentence":
+                        if db_q.get("sub_type") != target_q.get("sub_type"):
+                            is_match = False
+
+                    if is_match:
                         db_q["new"] = False
                         record_changed = True
                         changed_any = True
-
-                        # OPTİMİZASYON 3: Eşleşme bulundu ve soru "old" yapıldı.
-                        # Bu soru için diğer hedeflere bakmaya gerek yok, döngüyü kırıp sıradaki DB sorusuna geçiyoruz.
                         break
 
-                        # Eğer bu kaydın içindeki herhangi bir soruda değişiklik yapıldıysa JSON verisini güncelle
             if record_changed:
                 record.questions = updated_questions
                 flag_modified(record, "questions")
 
-        # 4. En az 1 soruda değişiklik olduysa veritabanına kaydet
         if changed_any:
             db.session.commit()
             return {"msg": "Belirtilen soruların statüsü başarıyla (old olarak) güncellendi"}, 200

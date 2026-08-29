@@ -138,7 +138,8 @@ class QuizService:
             "     * If it is 'use_plural_in_multi_choice', use the plural form ONLY in the multiple-choice question.\n"
             "     * If it is 'use_plural_in_sentence', use the plural form ONLY in the example sentence.\n"
             "     * If it is 'use_singular_only' (or missing), use ONLY the singular form in both outputs.\n"
-            "   - STRICT LIMIT: For any single target word, NEVER use the plural form in both of its generated outputs."
+            "   - STRICT LIMIT: For any single target word, NEVER use the plural form in both of its generated outputs.\n"
+            "7. GRAMMAR & SYNTAX: NEVER use inverted sentences or non-standard word order. Always construct natural sentences using standard, direct grammatical structures (e.g., standard Subject-Verb-Object order) appropriate for both the Learning Language and the Known Language."
         )
 
         user_content = (
