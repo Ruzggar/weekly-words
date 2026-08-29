@@ -7,6 +7,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    learning_language = db.Column(db.String(2), nullable=False)
+    known_language = db.Column(db.String(2), nullable=False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

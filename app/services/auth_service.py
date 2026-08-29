@@ -8,14 +8,24 @@ from app.models.user import User
 class AuthService:
 
     @staticmethod
-    def register_user(username, password):
-        if not username or not password:
-            return {"error": "Kullanıcı adı ve şifre zorunludur"}, 400
+    def register_user(username, password, learning_language, known_language):
+        if not username or not password or not learning_language or not known_language:
+            return {"error": "Kullanıcı adı, şifre ve dil bilgisi zorunludur"}, 400
+
+        if not isinstance(learning_language, str) or not isinstance(known_language, str):
+            return {"error": "Dil bilgileri metin (string) formatında olmalıdır"}, 400
+
+        learning_language = learning_language.strip().lower()
+        known_language = known_language.strip().lower()
+
+        allowed_languages = ["tr", "en", "de", "el"]
+        if learning_language not in allowed_languages or known_language not in allowed_languages:
+            return {"error": "Desteklenen diller: tr, en, de, el"}, 400
 
         if db.session.query(User).filter_by(username=username).first():
             return {"error": "Bu kullanıcı adı zaten alınmış"}, 400
 
-        new_user = User(username=username)
+        new_user = User(username=username, learning_language=learning_language, known_language=known_language)
         new_user.set_password(password)
 
         db.session.add(new_user)
@@ -37,7 +47,9 @@ class AuthService:
         )
 
         return {
-            "access_token": access_token
+            "access_token": access_token,
+            "learning_language": user.learning_language,
+            "known_language": user.known_language
         }, 200
 
     @staticmethod

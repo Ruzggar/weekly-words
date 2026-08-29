@@ -11,7 +11,9 @@ def register():
     data = request.get_json()
     result, status_code = AuthService.register_user(
         username=data.get('username'),
-        password=data.get('password')
+        password=data.get('password'),
+        learning_language=data.get('learning_language'),
+        known_language=data.get('known_language')
     )
     return jsonify(result), status_code
 

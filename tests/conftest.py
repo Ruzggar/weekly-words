@@ -28,7 +28,7 @@ def client(app):
 @pytest.fixture
 def auth_headers(client):
     """Testler için standart bir kullanıcı kaydeder ve yetkilendirme başlığını döner."""
-    client.post('/auth/register', json={"username": "testuser", "password": "password123"})
+    client.post('/auth/register', json={"username": "testuser", "password": "password123", "learning_language": "en", "known_language": "tr"})
     response = client.post('/auth/login', json={"username": "testuser", "password": "password123"})
     token = response.get_json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

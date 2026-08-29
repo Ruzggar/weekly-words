@@ -1,23 +1,71 @@
 def test_register_success(client):
-    response = client.post('/auth/register', json={"username": "newuser", "password": "123"})
+    response = client.post('/auth/register', json={
+        "username": "newuser",
+        "password": "123",
+        "learning_language": "en",
+        "known_language": "tr"
+    })
     assert response.status_code == 201
 
 
+def test_register_missing_fields(client):
+    # Dil bilgileri eksik gönderildiğinde 400 dönmeli
+    response = client.post('/auth/register', json={
+        "username": "newuser",
+        "password": "123"
+    })
+    assert response.status_code == 400
+    assert "zorunludur" in response.get_json()["error"]
+
+
+def test_register_invalid_language(client):
+    # Desteklenmeyen bir dil (örn: fr) gönderildiğinde 400 dönmeli
+    response = client.post('/auth/register', json={
+        "username": "newuser",
+        "password": "123",
+        "learning_language": "fr",
+        "known_language": "tr"
+    })
+    assert response.status_code == 400
+    assert "Desteklenen diller" in response.get_json()["error"]
+
+
 def test_register_duplicate(client):
-    client.post('/auth/register', json={"username": "newuser", "password": "123"})
-    response = client.post('/auth/register', json={"username": "newuser", "password": "123"})
+    payload = {
+        "username": "newuser",
+        "password": "123",
+        "learning_language": "en",
+        "known_language": "tr"
+    }
+    client.post('/auth/register', json=payload)
+    response = client.post('/auth/register', json=payload)
     assert response.status_code == 400
 
 
 def test_login_success(client):
-    client.post('/auth/register', json={"username": "logintest", "password": "123"})
+    client.post('/auth/register', json={
+        "username": "logintest",
+        "password": "123",
+        "learning_language": "de",
+        "known_language": "tr"
+    })
     response = client.post('/auth/login', json={"username": "logintest", "password": "123"})
     assert response.status_code == 200
-    assert "access_token" in response.get_json()
+
+    # Login işleminde access_token ve dil bilgileri dönmeli
+    data = response.get_json()
+    assert "access_token" in data
+    assert data["learning_language"] == "de"
+    assert data["known_language"] == "tr"
 
 
 def test_login_wrong_password(client):
-    client.post('/auth/register', json={"username": "logintest", "password": "123"})
+    client.post('/auth/register', json={
+        "username": "logintest",
+        "password": "123",
+        "learning_language": "en",
+        "known_language": "tr"
+    })
     response = client.post('/auth/login', json={"username": "logintest", "password": "wrong"})
     assert response.status_code == 401
 
