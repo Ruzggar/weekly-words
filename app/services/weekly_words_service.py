@@ -1,3 +1,5 @@
+from flask import current_app
+
 from app.extensions import db
 from app.models.quiz import Quiz
 from app.models.weekly_words import WeeklyWords
@@ -30,6 +32,9 @@ class WeeklyWordsService:
 
         if not isinstance(words, list) or not isinstance(learning_language, str) or not isinstance(known_language, str):
             return {"error": "Kelimeler liste, diller string olmalıdır"}, 400
+
+        if not current_app.config.get('TESTING') and len(words) < 10:
+            return {"error": "Bir hafta en az 10 kelimeden oluşmalıdır"}, 400
 
         learning_language = learning_language.strip().lower()
         known_language = known_language.strip().lower()

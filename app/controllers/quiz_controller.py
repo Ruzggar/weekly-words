@@ -84,3 +84,25 @@ def quiz_completed():
     result, status_code = QuizService.quiz_completed(user_id, username, data)
 
     return jsonify(result), status_code
+
+@quiz_bp.route('/save-quiz-progress/<int:week_number>/<int:day_number>', defaults={'current_index': None}, methods=['POST'])
+@quiz_bp.route('/save-quiz-progress/<int:week_number>/<int:day_number>/<int:current_index>', methods=['POST'])
+@jwt_required()
+def save_quiz_progress(week_number, day_number, current_index):
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = QuizService.save_quiz_progress(user_id, username, week_number, day_number, current_index)
+
+    return jsonify(result), status_code
+
+
+@quiz_bp.route('/quiz-progress/<int:week_number>/<int:day_number>', methods=['GET'])
+@jwt_required()
+def get_quiz_progress(week_number, day_number):
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+
+    result, status_code = QuizService.get_quiz_progress(user_id, username, week_number, day_number)
+
+    return jsonify(result), status_code

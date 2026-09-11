@@ -334,3 +334,32 @@ class QuizService:
             return {"msg": "Quiz tamamlanması başarıyla işlendi ve yanlış cevap verilen sorular başarıyla eklendi"}, 200
         else:
             return result, status_code
+
+    @staticmethod
+    def save_quiz_progress(user_id, username, week_number, day_number, current_index):
+        if not week_number or day_number is None:
+            return {"error": "Hafta veya gün numarası boş bırakılamaz"}, 400
+
+        quiz = db.session.query(Quiz).filter_by(user_id=user_id, week_number=week_number, day_number=day_number).first()
+
+        if not quiz:
+            return {
+                "error": f"{username} adlı kullanıcıya ait {week_number}. hafta {day_number}. gün quizi bulunamadı"}, 404
+
+        quiz.progress = current_index
+        db.session.commit()
+
+        return {"msg": "Quiz ilerlemesi başarıyla kaydedildi"}, 200
+
+    @staticmethod
+    def get_quiz_progress(user_id, username, week_number, day_number):
+        if not week_number or day_number is None:
+            return {"error": "Hafta veya gün numarası boş bırakılamaz"}, 400
+
+        quiz = db.session.query(Quiz).filter_by(user_id=user_id, week_number=week_number, day_number=day_number).first()
+
+        if not quiz:
+            return {
+                "error": f"{username} adlı kullanıcıya ait {week_number}. hafta {day_number}. gün quizi bulunamadı"}, 404
+
+        return {"current_index": quiz.progress}, 200

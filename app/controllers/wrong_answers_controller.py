@@ -6,15 +6,15 @@ from app.services.wrong_answers_service import WrongAnswersService
 wrong_answers_bp = Blueprint('wrong_answers', __name__)
 
 
-# @wrong_answers_bp.route('/add-wrong-answers', methods=['POST'])
-# @jwt_required()
-# def add_wrong_answers():
-#     user_id = get_jwt_identity()
-#     username = get_jwt().get('username')
-#     data = request.get_json()
-#
-#     result, status_code = WrongAnswersService.add_wrong_answers(user_id, username, data)
-#     return jsonify(result), status_code
+@wrong_answers_bp.route('/add-wrong-answers', methods=['POST'])
+@jwt_required()
+def add_wrong_answers():
+    user_id = get_jwt_identity()
+    username = get_jwt().get('username')
+    data = request.get_json()
+
+    result, status_code = WrongAnswersService.add_wrong_answers(user_id, username, data)
+    return jsonify(result), status_code
 
 
 @wrong_answers_bp.route('/wrong-answers/<int:week_number>/<int:day_number>', methods=['GET'])

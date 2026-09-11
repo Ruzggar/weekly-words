@@ -1,13 +1,16 @@
 import os
 from datetime import timedelta, timezone, datetime
 
-from flask import Flask
+from flask import Flask, jsonify
+from flask_cors import CORS
 
 from app.extensions import db, jwt
 
 
 def create_app():
     app = Flask(__name__)
+
+    CORS(app)
 
     # Veritabanı yapılandırması
     basedir = os.path.abspath(os.path.dirname(__file__))
@@ -65,6 +68,25 @@ def create_app():
                     return True
 
         return False
+
+    # --- YENİ EKLENEN HATA YÖNETİMİ (ERROR HANDLERS) ---
+
+    # 1. Secret Key yanlışsa, token bozuksa veya imza geçersizse:
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error_string):
+        return jsonify({"error": "Secret key hatalı, you dirty hacker"}), 401
+
+    # 2. Token eksikse (Authorization header yoksa):
+    @jwt.unauthorized_loader
+    def missing_token_callback(error_string):
+        return jsonify({"error": "Token bulunamadı, lütfen giriş yapın."}), 401
+
+    # 3. Token'ın süresi (1 hafta) dolmuşsa:
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return jsonify({"error": "Token süresi dolmuş, lütfen tekrar giriş yapın."}), 401
+
+    # ---------------------------------------------------
 
     # Blueprints
     from app.controllers.auth_controller import auth_bp

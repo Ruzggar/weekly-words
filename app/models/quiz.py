@@ -12,5 +12,7 @@ class Quiz(db.Model):
     day_number = db.Column(db.Integer, nullable=False)
     final = db.Column(db.Boolean, nullable=False, default=False)
 
+    progress = db.Column(db.Integer, nullable=True, default=None)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

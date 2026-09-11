@@ -3,7 +3,6 @@ import random
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
-from app.models.user import User
 from app.models.wrong_answers import WrongAnswers
 
 
@@ -17,15 +16,11 @@ class WrongAnswersService:
         day_number = data.get("day_number")
         raw_questions = data.get("questions")
 
-        if not week_number or not day_number:
+        if not week_number or day_number is None:
             return {"error": "JSON içerisinde 'week_number' veya 'day_number' bulunamadı ya da boş"}, 400
 
         if not raw_questions or not isinstance(raw_questions, list):
             return {"error": "JSON'da 'questions' listesi bulunamadı veya formati hatalı"}, 400
-
-        user_exists = db.session.query(User.id).filter_by(id=user_id).scalar()
-        if not user_exists:
-            return {"error": f"{username} isimli ve {user_id} id'li bir kullanıcı bulunamadı"}, 404
 
         processed_questions = []
 

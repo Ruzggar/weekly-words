@@ -66,9 +66,10 @@ class AuthService:
             return {"error": "Kullanıcı bulunamadı"}, 404
 
         db.session.delete(user)
-        revoked_token = TokenBlocklist(jti=jti)
-        db.session.add(revoked_token)
         db.session.commit()
+
+        AuthService.logout_all_sessions(user_id)
+
         return {"msg": "Hesap başarıyla silindi"}, 200
 
     @staticmethod
@@ -87,8 +88,6 @@ class AuthService:
         user.username = new_username
         db.session.commit()
 
-        # 2. Kod tekrarı yapmadan, tüm cihazlardan çıkış fonksiyonunu çağır
-        # (Dönen sonucu bir değişkene atamamıza gerek yok)
         AuthService.logout_all_sessions(user_id)
 
         # 3. Mevcut cihaza yeni bilgilerle token ver
